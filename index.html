@@ -234,6 +234,12 @@
             <input type="range" id="period" name="period" min="0.5" max="5" step="0.1" value="1" class="flex-grow">
             <span id="periodValue" class="text-sm text-gray-700 value-display">1.0</span>
         </div>
+        <div class="control-row">
+            <label for="lcPointsSlider" class="text-sm font-medium text-gray-600 control-label">LC Sampling:</label>
+            <input type="range" id="lcPointsSlider" name="lcPointsSlider" min="50" max="1000" step="10" value="500"
+                class="flex-grow">
+            <span id="lcPointsValue" class="text-sm text-gray-700 value-display">500</span>
+        </div>
         <div class="control-row mt-2">
             <span class="text-sm font-medium text-gray-600 control-label">Semi-major Axis (a):</span>
             <span class="text-sm text-gray-700 value-display">Fixed Scale</span>
@@ -257,6 +263,7 @@
         const massRatioSlider = document.getElementById('massRatio');
         const radiusRatioSlider = document.getElementById('radiusRatio');
         const periodSlider = document.getElementById('period');
+        const lcPointsSlider = document.getElementById('lcPointsSlider'); // LC Sampling slider
         const eccentricityValue = document.getElementById('eccentricityValue');
         const omegaValue = document.getElementById('omegaValue');
         const inclinationValue = document.getElementById('inclinationValue');
@@ -264,28 +271,29 @@
         const massRatioValue = document.getElementById('massRatioValue');
         const radiusRatioValue = document.getElementById('radiusRatioValue');
         const periodValue = document.getElementById('periodValue');
+        const lcPointsValue = document.getElementById('lcPointsValue'); // LC Sampling display
         const pauseResumeButton = document.getElementById('pauseResumeButton');
 
         // --- Scene Setup ---
         let scene, camera, renderer, controls;
         let primaryStar, secondaryStar;
-        let primaryOrbitLine, secondaryOrbitLine;
+        let primaryOrbitTube, secondaryOrbitTube; // Changed from Line to Tube
         let axesHelper;
         let referenceDirectionLine, lineOfNodesLine, periastronDirectionLine;
-        // ascendingNodeMarker and periastronMarker removed
-        const markerSize = 0.1; // Kept for potential future use
         const lineLength = 7;
 
         // --- Light Curve Setup ---
         let lcCtx;
         let lightCurveData = [];
-        const lcPoints = 400; // Increased points for better phase resolution
+        let lcPoints = parseInt(lcPointsSlider.value); // Get initial value from slider
         let currentPhase = 0;
         let currentFlux = 1.0;
-        const basePeriod = 20; // Base orbital period in seconds for animation scaling
+        const basePeriod = 20;
 
         const starScaleFactor = 0.05;
-        const orbitPoints = 200;
+        const orbitTubeSegments = 128; // Segments along the tube length
+        const orbitTubeRadiusSegments = 8; // Segments around the tube radius
+        const orbitPoints = 200; // Points used to define the curve for the tube
 
         // --- Orbital Parameters ---
         let eccentricity = parseFloat(eccentricitySlider.value);
@@ -309,8 +317,8 @@
         const ORIGIN = new THREE.Vector3(0, 0, 0);
         const X_AXIS = new THREE.Vector3(1, 0, 0);
         const TWO_PI = 2 * Math.PI;
-        const ORBIT_LINE_WIDTH = 2.0; // Increased orbit line width
-        const LC_LINE_WIDTH = 2.0; // Increased light curve line width
+        const ORBIT_TUBE_RADIUS = 0.03; // Defines orbit line thickness
+        const LC_LINE_WIDTH = 2.0; // Light curve line width
 
         /**
          * Solves Kepler's Equation.
@@ -408,8 +416,11 @@
             calculateStarRadii();
             const effectivePeriod = basePeriod / Math.max(periodFactor, 0.01);
 
-            for (let i = 0; i <= lcPoints; i++) {
-                const time = (i / lcPoints) * effectivePeriod;
+            // Use the current value of lcPoints from the slider
+            const numPoints = lcPoints;
+
+            for (let i = 0; i <= numPoints; i++) {
+                const time = (i / numPoints) * effectivePeriod;
                 const phase = (time / effectivePeriod) % 1.0;
                 const M = (TWO_PI * time / effectivePeriod) % TWO_PI;
 
@@ -418,6 +429,8 @@
                 const flux = calculateFlux(pos1, pos2, radius1, radius2);
                 lightCurveData.push({ phase: phase, flux: flux });
             }
+            // Sort data by phase to ensure correct plotting order
+            lightCurveData.sort((a, b) => a.phase - b.phase);
         }
 
         /**
@@ -474,22 +487,50 @@
         }
 
         /**
-         * Creates or updates the orbit lines.
+         * Creates or updates the orbit lines using TubeGeometry.
          */
         function updateOrbitLines() {
             const primaryPoints = []; const secondaryPoints = [];
+            // Calculate points defining the curve
             for (let step = 0; step <= orbitPoints; step++) {
                 const M_orbit = (step / orbitPoints) * TWO_PI;
                 const relativePos = calculateRelativePosition3D(semiMajorAxisRelative, eccentricity, inclinationRad, omegaRad, OmegaRad, M_orbit);
                 const { pos1, pos2 } = calculateBarycentricPositions(relativePos, massRatio);
-                primaryPoints.push(pos1); secondaryPoints.push(pos2);
+                primaryPoints.push(pos1);
+                secondaryPoints.push(pos2);
             }
-            // Use constant for line width
-            if (!primaryOrbitLine) { const g = new THREE.BufferGeometry().setFromPoints(primaryPoints); const m = new THREE.LineBasicMaterial({ color: 0xf59e0b, linewidth: ORBIT_LINE_WIDTH }); primaryOrbitLine = new THREE.Line(g, m); scene.add(primaryOrbitLine); }
-            else { primaryOrbitLine.geometry.setFromPoints(primaryPoints); primaryOrbitLine.geometry.attributes.position.needsUpdate = true; primaryOrbitLine.geometry.computeBoundingSphere(); primaryOrbitLine.material.linewidth = ORBIT_LINE_WIDTH; } // Update width just in case
-            if (!secondaryOrbitLine) { const g = new THREE.BufferGeometry().setFromPoints(secondaryPoints); const m = new THREE.LineBasicMaterial({ color: 0x3b82f6, linewidth: ORBIT_LINE_WIDTH }); secondaryOrbitLine = new THREE.Line(g, m); scene.add(secondaryOrbitLine); }
-            else { secondaryOrbitLine.geometry.setFromPoints(secondaryPoints); secondaryOrbitLine.geometry.attributes.position.needsUpdate = true; secondaryOrbitLine.geometry.computeBoundingSphere(); secondaryOrbitLine.material.linewidth = ORBIT_LINE_WIDTH; }
+
+            // Create curves from points
+            const primaryCurve = new THREE.CatmullRomCurve3(primaryPoints, true); // Close the curve
+            const secondaryCurve = new THREE.CatmullRomCurve3(secondaryPoints, true); // Close the curve
+
+            // --- Primary Orbit Tube ---
+            if (!primaryOrbitTube) {
+                const tubeGeometry = new THREE.TubeGeometry(primaryCurve, orbitTubeSegments, ORBIT_TUBE_RADIUS, orbitTubeRadiusSegments, true);
+                const tubeMaterial = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.1, roughness: 0.8 });
+                primaryOrbitTube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+                scene.add(primaryOrbitTube);
+            } else {
+                // Update existing tube geometry
+                const newTubeGeometry = new THREE.TubeGeometry(primaryCurve, orbitTubeSegments, ORBIT_TUBE_RADIUS, orbitTubeRadiusSegments, true);
+                primaryOrbitTube.geometry.dispose(); // Dispose old geometry
+                primaryOrbitTube.geometry = newTubeGeometry;
+            }
+
+            // --- Secondary Orbit Tube ---
+            if (!secondaryOrbitTube) {
+                const tubeGeometry = new THREE.TubeGeometry(secondaryCurve, orbitTubeSegments, ORBIT_TUBE_RADIUS, orbitTubeRadiusSegments, true);
+                const tubeMaterial = new THREE.MeshStandardMaterial({ color: 0x3b82f6, metalness: 0.1, roughness: 0.8 });
+                secondaryOrbitTube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+                scene.add(secondaryOrbitTube);
+            } else {
+                // Update existing tube geometry
+                const newTubeGeometry = new THREE.TubeGeometry(secondaryCurve, orbitTubeSegments, ORBIT_TUBE_RADIUS, orbitTubeRadiusSegments, true);
+                secondaryOrbitTube.geometry.dispose(); // Dispose old geometry
+                secondaryOrbitTube.geometry = newTubeGeometry;
+            }
         }
+
 
         /**
          * Updates star sizes based on mass ratio (for 3D view).
@@ -513,30 +554,24 @@
             const ascNodeDir = new THREE.Vector3(Math.cos(OmegaRad), Math.sin(OmegaRad), 0).normalize();
             const periastronRelativePos = calculateRelativePosition3D(semiMajorAxisRelative, eccentricity, inclinationRad, omegaRad, OmegaRad, 0);
             const { pos2: periPos2 } = calculateBarycentricPositions(periastronRelativePos, massRatio);
-            const periastronDir = periPos2.clone().normalize(); // Direction from barycenter to secondary's periastron
+            const periastronDir = periPos2.clone().normalize();
 
-            // --- Update Reference Direction Line (X-axis) ---
+            // Update Reference Direction Line
             const refEndPoint = X_AXIS.clone().multiplyScalar(lineLength);
             if (!referenceDirectionLine) { const g = new THREE.BufferGeometry().setFromPoints([ORIGIN, refEndPoint]); const m = new THREE.LineBasicMaterial({ color: 0x888888 }); referenceDirectionLine = new THREE.Line(g, m); scene.add(referenceDirectionLine); }
             else { referenceDirectionLine.geometry.setFromPoints([ORIGIN, refEndPoint]); referenceDirectionLine.geometry.attributes.position.needsUpdate = true; }
 
-            // --- Update Line of Nodes ---
+            // Update Line of Nodes
             const nodeEndPoint1 = ascNodeDir.clone().multiplyScalar(lineLength); const nodeEndPoint2 = ascNodeDir.clone().multiplyScalar(-lineLength);
             if (!lineOfNodesLine) { const g = new THREE.BufferGeometry().setFromPoints([nodeEndPoint2, nodeEndPoint1]); const m = new THREE.LineBasicMaterial({ color: 0x00cc00, linewidth: 2 }); lineOfNodesLine = new THREE.Line(g, m); scene.add(lineOfNodesLine); }
             else { lineOfNodesLine.geometry.setFromPoints([nodeEndPoint2, nodeEndPoint1]); lineOfNodesLine.geometry.attributes.position.needsUpdate = true; }
 
-            // --- Update Periastron Direction Line ---
-            // Use the actual periastron direction vector
+            // Update Periastron Direction Line
             const periLineEndPoint = periastronDir.clone().multiplyScalar(lineLength * 0.9);
             if (!periastronDirectionLine) { const g = new THREE.BufferGeometry().setFromPoints([ORIGIN, periLineEndPoint]); const m = new THREE.LineBasicMaterial({ color: 0xcc0000 }); periastronDirectionLine = new THREE.Line(g, m); scene.add(periastronDirectionLine); }
             else { periastronDirectionLine.geometry.setFromPoints([ORIGIN, periLineEndPoint]); periastronDirectionLine.geometry.attributes.position.needsUpdate = true; }
 
-            // --- Remove Markers if they exist (cleanup from previous versions) ---
-            // ascendingNodeMarker and periastronMarker variables removed
-            const ascMarker = scene.getObjectByName("ascendingNodeMarker");
-            if (ascMarker) scene.remove(ascMarker);
-            const periMarker = scene.getObjectByName("periastronMarker");
-            if (periMarker) scene.remove(periMarker);
+            // Markers already removed in previous step's cleanup logic in this function.
         }
 
 
@@ -548,7 +583,6 @@
                 // --- Renderers ---
                 renderer = new THREE.WebGLRenderer({ canvas: orbitCanvas, antialias: true, alpha: true });
                 renderer.setPixelRatio(window.devicePixelRatio);
-                // labelRenderer removed
 
                 // --- Light Curve Context ---
                 lcCtx = lightCurveCanvas.getContext('2d');
@@ -582,8 +616,6 @@
                 axesHelper = new THREE.AxesHelper(semiMajorAxisRelative * 0.5);
                 scene.add(axesHelper);
 
-                // --- Parameter Labels Removed ---
-
                 // --- Initial Setup ---
                 handleResize();
                 updateParameters();
@@ -597,6 +629,7 @@
                 massRatioSlider.addEventListener('input', updateParameters);
                 radiusRatioSlider.addEventListener('input', updateParameters);
                 periodSlider.addEventListener('input', updateParameters);
+                lcPointsSlider.addEventListener('input', updateParameters); // Listener for LC points
                 pauseResumeButton.addEventListener('click', togglePause);
 
                 // --- Start Animation ---
@@ -621,13 +654,11 @@
             const width3D = container3D.clientWidth;
             const height3D = container3D.clientHeight;
             renderer.setSize(width3D, height3D);
-            // labelRenderer removed
             camera.aspect = width3D / height3D;
             camera.updateProjectionMatrix();
 
             // Trigger light curve redraw on next animation frame implicitly
-            // Or force redraw immediately if needed:
-            // drawLightCurve();
+            drawLightCurve(); // Force redraw immediately on resize
         }
 
         /**
@@ -642,6 +673,7 @@
             massRatio = parseFloat(massRatioSlider.value);
             radiusRatio = parseFloat(radiusRatioSlider.value);
             periodFactor = parseFloat(periodSlider.value);
+            lcPoints = parseInt(lcPointsSlider.value); // Read LC sampling points
 
             // Update text displays
             eccentricityValue.textContent = eccentricity.toFixed(2);
@@ -651,12 +683,12 @@
             massRatioValue.textContent = massRatio.toFixed(1);
             radiusRatioValue.textContent = radiusRatio.toFixed(1);
             periodValue.textContent = periodFactor.toFixed(1);
-            // Label update removed
+            lcPointsValue.textContent = lcPoints; // Update LC points display
 
             // Update 3D visuals
-            updateOrbitLines();
+            updateOrbitLines(); // Uses TubeGeometry now
             updateStarSizes();
-            updateGeometricElements(); // Now only updates lines
+            updateGeometricElements(); // Only updates lines
 
             // Update Light Curve Data
             updateFullLightCurve(); // Recalculate the full curve
@@ -718,7 +750,6 @@
 
             controls.update();
             renderer.render(scene, camera);
-            // labelRenderer removed
         }
 
         // --- Initialization ---
@@ -732,9 +763,9 @@
         window.addEventListener('unload', () => {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             if (renderer) renderer.dispose();
-            // labelRenderer removed
             if (scene) {
                 scene.traverse(object => {
+                    // Dispose geometries and materials
                     if (object.geometry) object.geometry.dispose();
                     if (object.material) {
                         if (Array.isArray(object.material)) {
@@ -742,6 +773,10 @@
                         } else {
                             object.material.dispose();
                         }
+                    }
+                    // Remove object from scene if it's a mesh, line, etc.
+                    if (object.isMesh || object.isLine) {
+                        scene.remove(object);
                     }
                 });
             }
