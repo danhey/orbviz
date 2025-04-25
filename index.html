@@ -376,6 +376,8 @@
         // --- Constants ---
         const ORIGIN = new THREE.Vector3(0, 0, 0);
         const X_AXIS = new THREE.Vector3(1, 0, 0);
+        const Y_AXIS = new THREE.Vector3(0, 1, 0);
+        const Z_AXIS = new THREE.Vector3(0, 0, 1);
         const TWO_PI = 2 * Math.PI;
         const ORBIT_TUBE_RADIUS = 0.03;
         const LC_LINE_WIDTH = 2.0;
@@ -384,13 +386,16 @@
         const semiMajorAxisRelative = 5; // Define before use
         const totalRadiusScale = 0.15; // Define before use
         const defaultCameraPosition = new THREE.Vector3(0, semiMajorAxisRelative * 1.5, semiMajorAxisRelative * 3); // Now defined after semiMajorAxisRelative
+        const ARC_RADIUS = 1.5; // Radius for the angle arcs
+        const ARC_SEGMENTS = 32; // Segments for the angle arcs
 
         // --- Scene Setup ---
         let scene, camera, renderer, controls, composer, bloomPass;
         let primaryStar, secondaryStar, starField;
         let primaryOrbitTube, secondaryOrbitTube;
-        let axesHelper, barycenterMarker; // Added barycenterMarker
+        let axesHelper, barycenterMarker;
         let referenceDirectionLine, lineOfNodesLine, periastronDirectionLine;
+        let omegaArcLine, OmegaArcLine; // Lines for angle arcs
         const lineLength = 7;
 
         // --- Light Curve Setup ---
@@ -683,7 +688,7 @@
         }
 
         /**
-         * Creates or updates the geometric visualization elements (lines only).
+         * Creates or updates the geometric visualization elements (lines and angle arcs).
          */
         function updateGeometricElements() {
             const ascNodeDir = new THREE.Vector3(Math.cos(OmegaRad), Math.sin(OmegaRad), 0).normalize();
@@ -691,22 +696,69 @@
             const { pos2: periPos2 } = calculateBarycentricPositions(periastronRelativePos, massRatio);
             const periastronDir = (periPos2 && periPos2.lengthSq() > 1e-9) ? periPos2.clone().normalize() : new THREE.Vector3(1, 0, 0);
 
-            // Update Reference Direction Line
+            // --- Update Lines ---
+            // Reference Direction Line
             const refEndPoint = X_AXIS.clone().multiplyScalar(lineLength);
             if (!referenceDirectionLine) { const g = new THREE.BufferGeometry().setFromPoints([ORIGIN, refEndPoint]); const m = new THREE.LineBasicMaterial({ color: 0xaaaaaa }); referenceDirectionLine = new THREE.Line(g, m); scene.add(referenceDirectionLine); }
             else { referenceDirectionLine.geometry.setFromPoints([ORIGIN, refEndPoint]); referenceDirectionLine.geometry.attributes.position.needsUpdate = true; }
-
-            // Update Line of Nodes
+            // Line of Nodes
             const nodeEndPoint1 = ascNodeDir.clone().multiplyScalar(lineLength); const nodeEndPoint2 = ascNodeDir.clone().multiplyScalar(-lineLength);
             if (!lineOfNodesLine) { const g = new THREE.BufferGeometry().setFromPoints([nodeEndPoint2, nodeEndPoint1]); const m = new THREE.LineBasicMaterial({ color: 0x34d399, linewidth: 2 }); lineOfNodesLine = new THREE.Line(g, m); scene.add(lineOfNodesLine); }
             else { lineOfNodesLine.geometry.setFromPoints([nodeEndPoint2, nodeEndPoint1]); lineOfNodesLine.geometry.attributes.position.needsUpdate = true; }
-
-            // Update Periastron Direction Line
+            // Periastron Direction Line
             const periLineEndPoint = periastronDir.clone().multiplyScalar(lineLength * 0.9);
             if (!periastronDirectionLine) { const g = new THREE.BufferGeometry().setFromPoints([ORIGIN, periLineEndPoint]); const m = new THREE.LineBasicMaterial({ color: 0xf87171 }); periastronDirectionLine = new THREE.Line(g, m); scene.add(periastronDirectionLine); }
             else { periastronDirectionLine.geometry.setFromPoints([ORIGIN, periLineEndPoint]); periastronDirectionLine.geometry.attributes.position.needsUpdate = true; }
 
-            // Markers are removed.
+            // --- Update Angle Arcs ---
+            // Omega Arc (Longitude of Ascending Node) - in XY plane
+            const OmegaArcCurve = new THREE.EllipseCurve(
+                0, 0,             // ax, aY
+                ARC_RADIUS, ARC_RADIUS, // xRadius, yRadius
+                0, OmegaRad,       // aStartAngle, aEndAngle
+                false,            // aClockwise
+                0                 // aRotation
+            );
+            const OmegaArcPoints = OmegaArcCurve.getPoints(ARC_SEGMENTS);
+            if (!OmegaArcLine) {
+                const geometry = new THREE.BufferGeometry().setFromPoints(OmegaArcPoints);
+                const material = new THREE.LineBasicMaterial({ color: 0x00ffff }); // Cyan
+                OmegaArcLine = new THREE.Line(geometry, material);
+                scene.add(OmegaArcLine);
+            } else {
+                OmegaArcLine.geometry.setFromPoints(OmegaArcPoints);
+                OmegaArcLine.geometry.attributes.position.needsUpdate = true;
+            }
+
+            // omega Arc (Argument of Periastron) - in orbital plane
+            const omegaArcCurve = new THREE.EllipseCurve(
+                0, 0,             // Center at origin before rotation
+                ARC_RADIUS * 1.1, ARC_RADIUS * 1.1, // Slightly larger radius
+                0, omegaRad,       // Start at node (0 angle in orb plane), end at periastron angle
+                false,
+                0
+            );
+            const omegaArcPoints = omegaArcCurve.getPoints(ARC_SEGMENTS);
+            const omegaArcGeometry = new THREE.BufferGeometry().setFromPoints(omegaArcPoints);
+
+            // Create or update the line object
+            if (!omegaArcLine) {
+                const material = new THREE.LineBasicMaterial({ color: 0xffff00 }); // Yellow
+                omegaArcLine = new THREE.Line(omegaArcGeometry, material);
+                scene.add(omegaArcLine);
+            } else {
+                omegaArcLine.geometry.dispose(); // Dispose old geometry
+                omegaArcLine.geometry = omegaArcGeometry;
+            }
+
+            // Orient the omega arc according to i and Omega
+            // 1. Rotate around Z by Omega to align the node line
+            // 2. Rotate around the (new) X-axis (which is now the node line) by i
+            omegaArcLine.rotation.set(0, 0, 0); // Reset rotation
+            omegaArcLine.rotateOnWorldAxis(Z_AXIS, OmegaRad); // Rotate around Z by Omega
+            const nodeAxis = new THREE.Vector3(Math.cos(OmegaRad), Math.sin(OmegaRad), 0); // Axis along the node line
+            omegaArcLine.rotateOnWorldAxis(nodeAxis, inclinationRad); // Rotate around node line by i
+
         }
 
         /**
@@ -878,7 +930,7 @@
             // Update 3D visuals
             updateOrbitLines();
             updateStarSizes();
-            updateGeometricElements();
+            updateGeometricElements(); // Updates lines and angle arcs
 
             // Update Light Curve Data
             updateFullLightCurve();
