@@ -9,18 +9,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
-
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #000000;
-            /* Black background for space */
+            background-color: #f3f4f6;
+            /* Fallback background */
             margin: 0;
             overflow: hidden;
             /* Prevent scrollbars */
@@ -35,8 +28,8 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
-            background-color: #000000;
-            /* Black background */
+            background-color: #e5e7eb;
+            /* gray-200 background for the area */
         }
 
         /* Container for 3D canvas */
@@ -49,7 +42,8 @@
             /* For positioning canvas inside */
             overflow: hidden;
             /* Clip contents */
-            /* Background set by three.js scene */
+            background-color: #ffffff;
+            /* White background for 3D view */
         }
 
         #orbitCanvas {
@@ -68,10 +62,9 @@
             /* Slightly taller light curve */
             flex-shrink: 0;
             /* Prevent shrinking */
-            background-color: #1f2937;
-            /* Dark gray background */
-            border-top: 1px solid #4b5563;
-            /* Lighter gray separator */
+            background-color: #ffffff;
+            border-top: 1px solid #d1d5db;
+            /* Separator line */
             padding: 0.75rem;
             /* p-3 */
             box-sizing: border-box;
@@ -83,10 +76,6 @@
             display: block;
             width: 100%;
             height: 100%;
-            background-color: #374151;
-            /* Slightly lighter dark gray */
-            border-radius: 0.25rem;
-            /* rounded-sm */
         }
 
         /* Floating Controls Container */
@@ -102,8 +91,8 @@
             /* Fixed width */
             max-height: calc(100vh - 2rem);
             /* Limit height */
-            background-color: rgba(31, 41, 55, 0.85);
-            /* Dark gray semi-transparent background */
+            background-color: rgba(255, 255, 255, 0.9);
+            /* Semi-transparent background */
             backdrop-filter: blur(5px);
             /* Optional blur effect */
             -webkit-backdrop-filter: blur(5px);
@@ -111,61 +100,14 @@
             padding: 1rem;
             border-radius: 0.5rem;
             /* rounded-lg */
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2);
-            /* Darker shadow */
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            /* shadow-md */
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
             /* gap-3 */
-            overflow: hidden;
-            /* Hide content when collapsed */
-            transition: max-height 0.3s ease-in-out, padding 0.3s ease-in-out;
-            /* Smooth collapse */
-            color: #e5e7eb;
-            /* Light gray text */
-        }
-
-        #controlsContainer.collapsed {
-            max-height: 40px;
-            /* Height when collapsed (adjust based on button/title) */
-            padding-top: 0.5rem;
-            padding-bottom: 0.5rem;
-            overflow: hidden;
-        }
-
-        #controlsContent {
-            /* Content that gets hidden */
             overflow-y: auto;
             /* Allow scrolling if content overflows */
-            max-height: calc(100vh - 6rem);
-            /* Adjust based on container padding/button */
-            transition: opacity 0.3s ease-in-out;
-        }
-
-        #controlsContainer.collapsed #controlsContent {
-            opacity: 0;
-            max-height: 0;
-            pointer-events: none;
-            /* Prevent interaction when hidden */
-        }
-
-        #collapseButton {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            background: none;
-            border: none;
-            color: #9ca3af;
-            /* gray-400 */
-            font-size: 1.2rem;
-            cursor: pointer;
-            padding: 0.25rem;
-            line-height: 1;
-        }
-
-        #collapseButton:hover {
-            color: #e5e7eb;
-            /* gray-200 */
         }
 
         /* Responsive width for controls on smaller screens */
@@ -188,9 +130,8 @@
             appearance: none;
             width: 100%;
             height: 6px;
-            background: #4b5563;
+            background: #d1d5db;
             border-radius: 3px;
-            /* Darker track */
             outline: none;
             opacity: 0.9;
             transition: opacity .2s;
@@ -205,16 +146,15 @@
             appearance: none;
             width: 16px;
             height: 16px;
-            background: #60a5fa;
+            background: #3b82f6;
             border-radius: 50%;
             cursor: pointer;
-            /* Lighter blue thumb */
         }
 
         input[type="range"]::-moz-range-thumb {
             width: 16px;
             height: 16px;
-            background: #60a5fa;
+            background: #3b82f6;
             border-radius: 50%;
             cursor: pointer;
             border: none;
@@ -224,8 +164,6 @@
             min-width: 140px;
             flex-shrink: 0;
             font-size: 0.8rem;
-            color: #d1d5db;
-            /* Lighter gray text */
         }
 
         .value-display {
@@ -233,8 +171,6 @@
             font-weight: 500;
             text-align: right;
             font-size: 0.8rem;
-            color: #e5e7eb;
-            /* Light gray text */
         }
 
         .control-row {
@@ -242,11 +178,6 @@
             align-items: center;
             gap: 0.5rem;
             /* gap-2 */
-        }
-
-        h2 {
-            color: #f3f4f6;
-            /* Lighter title */
         }
     </style>
 </head>
@@ -262,63 +193,62 @@
     </div>
 
     <div id="controlsContainer">
-        <button id="collapseButton" title="Toggle Controls">☰</button>
-        <h2 class="text-base font-semibold mb-1 text-gray-200">Orbital Parameters</h2>
-        <div id="controlsContent">
-            <div class="control-row">
-                <label for="eccentricity" class="control-label">Eccentricity (e):</label>
-                <input type="range" id="eccentricity" name="eccentricity" min="0" max="0.95" step="0.01" value="0.5"
-                    class="flex-grow">
-                <span id="eccentricityValue" class="value-display">0.50</span>
-            </div>
-            <div class="control-row">
-                <label for="omega" class="control-label">Arg. of Peri. (ω):</label>
-                <input type="range" id="omega" name="omega" min="0" max="360" step="1" value="45" class="flex-grow">
-                <span id="omegaValue" class="value-display">45°</span>
-            </div>
-            <div class="control-row">
-                <label for="inclination" class="control-label">Inclination (i):</label>
-                <input type="range" id="inclination" name="inclination" min="0" max="180" step="1" value="90"
-                    class="flex-grow"> <span id="inclinationValue" class="value-display">90°</span>
-            </div>
-            <div class="control-row">
-                <label for="Omega" class="control-label">Long. Asc. Node (Ω):</label>
-                <input type="range" id="Omega" name="Omega" min="0" max="360" step="1" value="60" class="flex-grow">
-                <span id="OmegaValue" class="value-display">60°</span>
-            </div>
-            <div class="control-row">
-                <label for="massRatio" class="control-label">Mass Ratio (m2/m1):</label>
-                <input type="range" id="massRatio" name="massRatio" min="0.1" max="10" step="0.1" value="0.5"
-                    class="flex-grow">
-                <span id="massRatioValue" class="value-display">0.5</span>
-            </div>
-            <div class="control-row">
-                <label for="radiusRatio" class="control-label">Radius Ratio (r2/r1):</label>
-                <input type="range" id="radiusRatio" name="radiusRatio" min="0.1" max="10" step="0.1" value="0.7"
-                    class="flex-grow">
-                <span id="radiusRatioValue" class="value-display">0.7</span>
-            </div>
-            <div class="control-row">
-                <label for="period" class="control-label">Period Factor:</label>
-                <input type="range" id="period" name="period" min="0.5" max="5" step="0.1" value="1" class="flex-grow">
-                <span id="periodValue" class="value-display">1.0</span>
-            </div>
-            <div class="control-row">
-                <label for="lcPointsSlider" class="control-label">LC Sampling:</label>
-                <input type="range" id="lcPointsSlider" name="lcPointsSlider" min="50" max="1000" step="10" value="500"
-                    class="flex-grow">
-                <span id="lcPointsValue" class="value-display">500</span>
-            </div>
-            <div class="control-row mt-2">
-                <span class="control-label">Semi-major Axis (a):</span>
-                <span class="value-display">Fixed Scale</span>
-            </div>
-            <div class="mt-2">
-                <button id="pauseResumeButton"
-                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm transition duration-150 ease-in-out">
-                    Pause Animation
-                </button>
-            </div>
+        <h2 class="text-base font-semibold mb-1 text-gray-700">Orbital Parameters</h2>
+
+        <div class="control-row">
+            <label for="eccentricity" class="text-sm font-medium text-gray-600 control-label">Eccentricity (e):</label>
+            <input type="range" id="eccentricity" name="eccentricity" min="0" max="0.95" step="0.01" value="0.5"
+                class="flex-grow">
+            <span id="eccentricityValue" class="text-sm text-gray-700 value-display">0.50</span>
+        </div>
+        <div class="control-row">
+            <label for="omega" class="text-sm font-medium text-gray-600 control-label">Arg. of Peri. (ω):</label>
+            <input type="range" id="omega" name="omega" min="0" max="360" step="1" value="45" class="flex-grow">
+            <span id="omegaValue" class="text-sm text-gray-700 value-display">45°</span>
+        </div>
+        <div class="control-row">
+            <label for="inclination" class="text-sm font-medium text-gray-600 control-label">Inclination (i):</label>
+            <input type="range" id="inclination" name="inclination" min="0" max="180" step="1" value="90"
+                class="flex-grow"> <span id="inclinationValue" class="text-sm text-gray-700 value-display">90°</span>
+        </div>
+        <div class="control-row">
+            <label for="Omega" class="text-sm font-medium text-gray-600 control-label">Long. Asc. Node (Ω):</label>
+            <input type="range" id="Omega" name="Omega" min="0" max="360" step="1" value="60" class="flex-grow">
+            <span id="OmegaValue" class="text-sm text-gray-700 value-display">60°</span>
+        </div>
+        <div class="control-row">
+            <label for="massRatio" class="text-sm font-medium text-gray-600 control-label">Mass Ratio (m2/m1):</label>
+            <input type="range" id="massRatio" name="massRatio" min="0.1" max="10" step="0.1" value="0.5"
+                class="flex-grow">
+            <span id="massRatioValue" class="text-sm text-gray-700 value-display">0.5</span>
+        </div>
+        <div class="control-row">
+            <label for="radiusRatio" class="text-sm font-medium text-gray-600 control-label">Radius Ratio
+                (r2/r1):</label>
+            <input type="range" id="radiusRatio" name="radiusRatio" min="0.1" max="10" step="0.1" value="0.7"
+                class="flex-grow">
+            <span id="radiusRatioValue" class="text-sm text-gray-700 value-display">0.7</span>
+        </div>
+        <div class="control-row">
+            <label for="period" class="text-sm font-medium text-gray-600 control-label">Period Factor:</label>
+            <input type="range" id="period" name="period" min="0.5" max="5" step="0.1" value="1" class="flex-grow">
+            <span id="periodValue" class="text-sm text-gray-700 value-display">1.0</span>
+        </div>
+        <div class="control-row">
+            <label for="lcPointsSlider" class="text-sm font-medium text-gray-600 control-label">LC Sampling:</label>
+            <input type="range" id="lcPointsSlider" name="lcPointsSlider" min="50" max="1000" step="10" value="500"
+                class="flex-grow">
+            <span id="lcPointsValue" class="text-sm text-gray-700 value-display">500</span>
+        </div>
+        <div class="control-row mt-2">
+            <span class="text-sm font-medium text-gray-600 control-label">Semi-major Axis (a):</span>
+            <span class="text-sm text-gray-700 value-display">Fixed Scale</span>
+        </div>
+        <div class="mt-2">
+            <button id="pauseResumeButton"
+                class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-2 rounded text-sm transition duration-150 ease-in-out">
+                Pause Animation
+            </button>
         </div>
     </div>
 
@@ -326,8 +256,6 @@
         // --- DOM Elements ---
         const orbitCanvas = document.getElementById('orbitCanvas');
         const lightCurveCanvas = document.getElementById('lightCurveCanvas');
-        const controlsContainer = document.getElementById('controlsContainer');
-        const collapseButton = document.getElementById('collapseButton');
         const eccentricitySlider = document.getElementById('eccentricity');
         const omegaSlider = document.getElementById('omega');
         const inclinationSlider = document.getElementById('inclination');
@@ -335,7 +263,7 @@
         const massRatioSlider = document.getElementById('massRatio');
         const radiusRatioSlider = document.getElementById('radiusRatio');
         const periodSlider = document.getElementById('period');
-        const lcPointsSlider = document.getElementById('lcPointsSlider');
+        const lcPointsSlider = document.getElementById('lcPointsSlider'); // LC Sampling slider
         const eccentricityValue = document.getElementById('eccentricityValue');
         const omegaValue = document.getElementById('omegaValue');
         const inclinationValue = document.getElementById('inclinationValue');
@@ -343,13 +271,13 @@
         const massRatioValue = document.getElementById('massRatioValue');
         const radiusRatioValue = document.getElementById('radiusRatioValue');
         const periodValue = document.getElementById('periodValue');
-        const lcPointsValue = document.getElementById('lcPointsValue');
+        const lcPointsValue = document.getElementById('lcPointsValue'); // LC Sampling display
         const pauseResumeButton = document.getElementById('pauseResumeButton');
 
         // --- Scene Setup ---
-        let scene, camera, renderer, controls, composer, bloomPass;
-        let primaryStar, secondaryStar, starField;
-        let primaryOrbitTube, secondaryOrbitTube;
+        let scene, camera, renderer, controls;
+        let primaryStar, secondaryStar;
+        let primaryOrbitTube, secondaryOrbitTube; // Changed from Line to Tube
         let axesHelper;
         let referenceDirectionLine, lineOfNodesLine, periastronDirectionLine;
         const lineLength = 7;
@@ -357,15 +285,15 @@
         // --- Light Curve Setup ---
         let lcCtx;
         let lightCurveData = [];
-        let lcPoints = parseInt(lcPointsSlider.value);
+        let lcPoints = parseInt(lcPointsSlider.value); // Get initial value from slider
         let currentPhase = 0;
         let currentFlux = 1.0;
         const basePeriod = 20;
 
         const starScaleFactor = 0.05;
-        const orbitTubeSegments = 128;
-        const orbitTubeRadiusSegments = 8;
-        const orbitPoints = 200;
+        const orbitTubeSegments = 128; // Segments along the tube length
+        const orbitTubeRadiusSegments = 8; // Segments around the tube radius
+        const orbitPoints = 200; // Points used to define the curve for the tube
 
         // --- Orbital Parameters ---
         let eccentricity = parseFloat(eccentricitySlider.value);
@@ -389,10 +317,8 @@
         const ORIGIN = new THREE.Vector3(0, 0, 0);
         const X_AXIS = new THREE.Vector3(1, 0, 0);
         const TWO_PI = 2 * Math.PI;
-        const ORBIT_TUBE_RADIUS = 0.03;
-        const LC_LINE_WIDTH = 2.0;
-        const STARFIELD_RADIUS = 100;
-        const STARFIELD_STARS = 5000;
+        const ORBIT_TUBE_RADIUS = 0.03; // Defines orbit line thickness
+        const LC_LINE_WIDTH = 2.0; // Light curve line width
 
         /**
          * Solves Kepler's Equation.
@@ -489,7 +415,9 @@
             lightCurveData = [];
             calculateStarRadii();
             const effectivePeriod = basePeriod / Math.max(periodFactor, 0.01);
-            const numPoints = lcPoints; // Use current value
+
+            // Use the current value of lcPoints from the slider
+            const numPoints = lcPoints;
 
             for (let i = 0; i <= numPoints; i++) {
                 const time = (i / numPoints) * effectivePeriod;
@@ -501,11 +429,12 @@
                 const flux = calculateFlux(pos1, pos2, radius1, radius2);
                 lightCurveData.push({ phase: phase, flux: flux });
             }
+            // Sort data by phase to ensure correct plotting order
             lightCurveData.sort((a, b) => a.phase - b.phase);
         }
 
         /**
-         * Draws the light curve on the 2D canvas with grid lines.
+         * Draws the light curve on the 2D canvas.
          */
         function drawLightCurve() {
             if (!lcCtx || !lightCurveData || lightCurveData.length === 0) return;
@@ -524,56 +453,27 @@
 
             lcCtx.setTransform(1, 0, 0, 1, 0, 0);
             lcCtx.clearRect(0, 0, canvasWidth, canvasHeight);
-            // Background is set by CSS now
+            lcCtx.fillStyle = "#ffffff";
+            lcCtx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-            // --- Calculate Y-axis scale ---
-            let minFlux = 1.0; lightCurveData.forEach(p => { minFlux = Math.min(minFlux, p.flux); });
-            const fluxRange = 1.0 - minFlux; const yMin = Math.max(0, minFlux - fluxRange * 0.1); const yMax = 1.0 + fluxRange * 0.05; const yRange = Math.max(yMax - yMin, 1e-6);
-            const getYPos = (fluxValue) => padding + plotHeight * (1.0 - (fluxValue - yMin) / yRange);
-
-            // --- Draw Grid Lines ---
-            lcCtx.strokeStyle = "#4b5563"; // Medium-dark gray grid
-            lcCtx.lineWidth = 0.5 * dpr;
-            // Vertical lines (Phase)
-            for (let phaseTick = 0.1; phaseTick < 1.0; phaseTick += 0.1) {
-                const x = padding + phaseTick * plotWidth;
-                lcCtx.beginPath();
-                lcCtx.moveTo(x, padding);
-                lcCtx.lineTo(x, canvasHeight - padding);
-                lcCtx.stroke();
-            }
-            // Horizontal lines (Flux) - Draw based on calculated range
-            const numFluxLines = 5;
-            for (let i = 0; i <= numFluxLines; i++) {
-                const fluxVal = yMin + (yRange * i / numFluxLines);
-                // Don't draw lines too close to 1.0 or minFlux if labels are there
-                if (Math.abs(fluxVal - 1.0) > 0.01 && Math.abs(fluxVal - minFlux) > 0.01) {
-                    const y = getYPos(fluxVal);
-                    lcCtx.beginPath();
-                    lcCtx.moveTo(padding, y);
-                    lcCtx.lineTo(canvasWidth - padding, y);
-                    lcCtx.stroke();
-                }
-            }
-
-
-            // --- Draw Axes ---
-            lcCtx.strokeStyle = "#9ca3af"; // Lighter gray axes
-            lcCtx.lineWidth = 1 * dpr;
+            // Draw Axes
+            lcCtx.strokeStyle = "#aaaaaa"; lcCtx.lineWidth = 1 * dpr;
             lcCtx.beginPath(); lcCtx.moveTo(padding, padding); lcCtx.lineTo(padding, canvasHeight - padding); lcCtx.lineTo(canvasWidth - padding, canvasHeight - padding); lcCtx.stroke();
 
-            // --- Draw Axis Labels/Ticks ---
-            lcCtx.fillStyle = "#d1d5db"; // Light gray text
-            lcCtx.font = `${10 * dpr}px Inter`;
+            // Draw Axis Labels/Ticks
+            lcCtx.fillStyle = "#555555"; lcCtx.font = `${10 * dpr}px Inter`;
             lcCtx.textAlign = "center"; lcCtx.textBaseline = "top";
             lcCtx.fillText("0.0", padding, canvasHeight - padding + 4 * dpr); lcCtx.fillText("0.5", padding + plotWidth / 2, canvasHeight - padding + 4 * dpr); lcCtx.fillText("1.0", padding + plotWidth, canvasHeight - padding + 4 * dpr); lcCtx.fillText("Phase", padding + plotWidth / 2, canvasHeight - padding + 12 * dpr);
             lcCtx.textAlign = "right"; lcCtx.textBaseline = "middle";
+            let minFlux = 1.0; lightCurveData.forEach(p => { minFlux = Math.min(minFlux, p.flux); });
+            const fluxRange = 1.0 - minFlux; const yMin = Math.max(0, minFlux - fluxRange * 0.1); const yMax = 1.0 + fluxRange * 0.05; const yRange = Math.max(yMax - yMin, 1e-6);
+            const getYPos = (fluxValue) => padding + plotHeight * (1.0 - (fluxValue - yMin) / yRange);
             lcCtx.fillText("1.0", padding - 4 * dpr, getYPos(1.0)); const minFluxYPos = getYPos(minFlux); lcCtx.fillText(minFlux.toFixed(2), padding - 4 * dpr, minFluxYPos);
             lcCtx.save(); lcCtx.translate(padding - 15 * dpr, canvasHeight / 2); lcCtx.rotate(-Math.PI / 2); lcCtx.textAlign = "center"; lcCtx.fillText("Norm. Flux", 0, 0); lcCtx.restore();
 
-            // --- Draw Full Light Curve ---
-            lcCtx.strokeStyle = "#60a5fa"; // Lighter blue
-            lcCtx.lineWidth = LC_LINE_WIDTH * dpr;
+            // Draw Full Light Curve
+            lcCtx.strokeStyle = "#3b82f6";
+            lcCtx.lineWidth = LC_LINE_WIDTH * dpr; // Use constant for line width
             lcCtx.beginPath();
             lightCurveData.forEach((point, index) => {
                 const x = padding + point.phase * plotWidth; const y = getYPos(point.flux);
@@ -581,10 +481,9 @@
             });
             lcCtx.stroke();
 
-            // --- Draw Current Phase Marker ---
+            // Draw Current Phase Marker
             const currentX = padding + currentPhase * plotWidth; const currentY = getYPos(currentFlux);
-            lcCtx.fillStyle = "#fcd34d"; // Lighter amber
-            lcCtx.beginPath(); lcCtx.arc(currentX, currentY, 3 * dpr, 0, TWO_PI); lcCtx.fill();
+            lcCtx.fillStyle = "#f59e0b"; lcCtx.beginPath(); lcCtx.arc(currentX, currentY, 3 * dpr, 0, TWO_PI); lcCtx.fill();
         }
 
         /**
@@ -592,47 +491,43 @@
          */
         function updateOrbitLines() {
             const primaryPoints = []; const secondaryPoints = [];
+            // Calculate points defining the curve
             for (let step = 0; step <= orbitPoints; step++) {
                 const M_orbit = (step / orbitPoints) * TWO_PI;
                 const relativePos = calculateRelativePosition3D(semiMajorAxisRelative, eccentricity, inclinationRad, omegaRad, OmegaRad, M_orbit);
                 const { pos1, pos2 } = calculateBarycentricPositions(relativePos, massRatio);
-                primaryPoints.push(pos1); secondaryPoints.push(pos2);
+                primaryPoints.push(pos1);
+                secondaryPoints.push(pos2);
             }
-            const primaryCurve = new THREE.CatmullRomCurve3(primaryPoints, true);
-            const secondaryCurve = new THREE.CatmullRomCurve3(secondaryPoints, true);
+
+            // Create curves from points
+            const primaryCurve = new THREE.CatmullRomCurve3(primaryPoints, true); // Close the curve
+            const secondaryCurve = new THREE.CatmullRomCurve3(secondaryPoints, true); // Close the curve
 
             // --- Primary Orbit Tube ---
             if (!primaryOrbitTube) {
                 const tubeGeometry = new THREE.TubeGeometry(primaryCurve, orbitTubeSegments, ORBIT_TUBE_RADIUS, orbitTubeRadiusSegments, true);
-                const tubeMaterial = new THREE.MeshStandardMaterial({
-                    color: 0xf59e0b, metalness: 0.1, roughness: 0.8,
-                    transparent: true, opacity: 0.7
-                });
+                const tubeMaterial = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.1, roughness: 0.8 });
                 primaryOrbitTube = new THREE.Mesh(tubeGeometry, tubeMaterial);
                 scene.add(primaryOrbitTube);
             } else {
+                // Update existing tube geometry
                 const newTubeGeometry = new THREE.TubeGeometry(primaryCurve, orbitTubeSegments, ORBIT_TUBE_RADIUS, orbitTubeRadiusSegments, true);
-                primaryOrbitTube.geometry.dispose();
+                primaryOrbitTube.geometry.dispose(); // Dispose old geometry
                 primaryOrbitTube.geometry = newTubeGeometry;
-                primaryOrbitTube.material.transparent = true;
-                primaryOrbitTube.material.opacity = 0.7;
             }
 
             // --- Secondary Orbit Tube ---
             if (!secondaryOrbitTube) {
                 const tubeGeometry = new THREE.TubeGeometry(secondaryCurve, orbitTubeSegments, ORBIT_TUBE_RADIUS, orbitTubeRadiusSegments, true);
-                const tubeMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x3b82f6, metalness: 0.1, roughness: 0.8,
-                    transparent: true, opacity: 0.7
-                });
+                const tubeMaterial = new THREE.MeshStandardMaterial({ color: 0x3b82f6, metalness: 0.1, roughness: 0.8 });
                 secondaryOrbitTube = new THREE.Mesh(tubeGeometry, tubeMaterial);
                 scene.add(secondaryOrbitTube);
             } else {
+                // Update existing tube geometry
                 const newTubeGeometry = new THREE.TubeGeometry(secondaryCurve, orbitTubeSegments, ORBIT_TUBE_RADIUS, orbitTubeRadiusSegments, true);
-                secondaryOrbitTube.geometry.dispose();
+                secondaryOrbitTube.geometry.dispose(); // Dispose old geometry
                 secondaryOrbitTube.geometry = newTubeGeometry;
-                secondaryOrbitTube.material.transparent = true;
-                secondaryOrbitTube.material.opacity = 0.7;
             }
         }
 
@@ -659,56 +554,24 @@
             const ascNodeDir = new THREE.Vector3(Math.cos(OmegaRad), Math.sin(OmegaRad), 0).normalize();
             const periastronRelativePos = calculateRelativePosition3D(semiMajorAxisRelative, eccentricity, inclinationRad, omegaRad, OmegaRad, 0);
             const { pos2: periPos2 } = calculateBarycentricPositions(periastronRelativePos, massRatio);
-            // Ensure periPos2 is a valid vector before normalizing
-            const periastronDir = (periPos2 && periPos2.lengthSq() > 1e-9) ? periPos2.clone().normalize() : new THREE.Vector3(1, 0, 0); // Default to X if calculation fails
+            const periastronDir = periPos2.clone().normalize();
 
             // Update Reference Direction Line
             const refEndPoint = X_AXIS.clone().multiplyScalar(lineLength);
-            if (!referenceDirectionLine) { const g = new THREE.BufferGeometry().setFromPoints([ORIGIN, refEndPoint]); const m = new THREE.LineBasicMaterial({ color: 0xaaaaaa }); referenceDirectionLine = new THREE.Line(g, m); scene.add(referenceDirectionLine); } // Lighter gray
+            if (!referenceDirectionLine) { const g = new THREE.BufferGeometry().setFromPoints([ORIGIN, refEndPoint]); const m = new THREE.LineBasicMaterial({ color: 0x888888 }); referenceDirectionLine = new THREE.Line(g, m); scene.add(referenceDirectionLine); }
             else { referenceDirectionLine.geometry.setFromPoints([ORIGIN, refEndPoint]); referenceDirectionLine.geometry.attributes.position.needsUpdate = true; }
 
             // Update Line of Nodes
             const nodeEndPoint1 = ascNodeDir.clone().multiplyScalar(lineLength); const nodeEndPoint2 = ascNodeDir.clone().multiplyScalar(-lineLength);
-            if (!lineOfNodesLine) { const g = new THREE.BufferGeometry().setFromPoints([nodeEndPoint2, nodeEndPoint1]); const m = new THREE.LineBasicMaterial({ color: 0x34d399, linewidth: 2 }); lineOfNodesLine = new THREE.Line(g, m); scene.add(lineOfNodesLine); } // Emerald green
+            if (!lineOfNodesLine) { const g = new THREE.BufferGeometry().setFromPoints([nodeEndPoint2, nodeEndPoint1]); const m = new THREE.LineBasicMaterial({ color: 0x00cc00, linewidth: 2 }); lineOfNodesLine = new THREE.Line(g, m); scene.add(lineOfNodesLine); }
             else { lineOfNodesLine.geometry.setFromPoints([nodeEndPoint2, nodeEndPoint1]); lineOfNodesLine.geometry.attributes.position.needsUpdate = true; }
 
             // Update Periastron Direction Line
             const periLineEndPoint = periastronDir.clone().multiplyScalar(lineLength * 0.9);
-            if (!periastronDirectionLine) { const g = new THREE.BufferGeometry().setFromPoints([ORIGIN, periLineEndPoint]); const m = new THREE.LineBasicMaterial({ color: 0xf87171 }); periastronDirectionLine = new THREE.Line(g, m); scene.add(periastronDirectionLine); } // Lighter red
+            if (!periastronDirectionLine) { const g = new THREE.BufferGeometry().setFromPoints([ORIGIN, periLineEndPoint]); const m = new THREE.LineBasicMaterial({ color: 0xcc0000 }); periastronDirectionLine = new THREE.Line(g, m); scene.add(periastronDirectionLine); }
             else { periastronDirectionLine.geometry.setFromPoints([ORIGIN, periLineEndPoint]); periastronDirectionLine.geometry.attributes.position.needsUpdate = true; }
 
-            // Markers are removed.
-        }
-
-        /**
-         * Creates the starfield background.
-         */
-        function createStarfield() {
-            const starVertices = [];
-            for (let i = 0; i < STARFIELD_STARS; i++) {
-                const u = Math.random();
-                const v = Math.random();
-                const theta = 2 * Math.PI * u; // Azimuthal angle
-                const phi = Math.acos(2 * v - 1); // Polar angle (from +Z)
-                const r = STARFIELD_RADIUS * (0.8 + Math.random() * 0.2); // Add some depth variation
-
-                const x = r * Math.sin(phi) * Math.cos(theta);
-                const y = r * Math.sin(phi) * Math.sin(theta);
-                const z = r * Math.cos(phi);
-
-                starVertices.push(x, y, z);
-            }
-            const starGeometry = new THREE.BufferGeometry();
-            starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
-
-            const starMaterial = new THREE.PointsMaterial({
-                color: 0xffffff,
-                size: 0.15,
-                sizeAttenuation: true
-            });
-
-            starField = new THREE.Points(starGeometry, starMaterial);
-            scene.add(starField);
+            // Markers already removed in previous step's cleanup logic in this function.
         }
 
 
@@ -718,55 +581,40 @@
         function init() {
             try {
                 // --- Renderers ---
-                renderer = new THREE.WebGLRenderer({ canvas: orbitCanvas, antialias: true });
+                renderer = new THREE.WebGLRenderer({ canvas: orbitCanvas, antialias: true, alpha: true });
                 renderer.setPixelRatio(window.devicePixelRatio);
-                renderer.toneMapping = THREE.ReinhardToneMapping;
 
                 // --- Light Curve Context ---
                 lcCtx = lightCurveCanvas.getContext('2d');
 
                 // --- Scene, Camera, Lights ---
                 scene = new THREE.Scene();
-
+                scene.background = new THREE.Color(0xffffff);
                 const initialWidth = orbitCanvas.clientWidth || window.innerWidth;
                 const initialHeight = orbitCanvas.clientHeight || window.innerHeight;
                 const aspect = initialWidth / initialHeight;
-                camera = new THREE.PerspectiveCamera(50, aspect, 0.1, STARFIELD_RADIUS * 1.5);
+                camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 1000);
                 camera.position.set(0, semiMajorAxisRelative * 1.5, semiMajorAxisRelative * 3);
                 camera.lookAt(ORIGIN);
-                const ambientLight = new THREE.AmbientLight(0x666666); scene.add(ambientLight);
-                const pointLight = new THREE.PointLight(0xffffff, 0.8, 0, 2); camera.add(pointLight); scene.add(camera);
+                const ambientLight = new THREE.AmbientLight(0xcccccc, 0.6); scene.add(ambientLight);
+                const pointLight = new THREE.PointLight(0xffffff, 0.8); camera.add(pointLight); scene.add(camera);
 
                 // --- Controls ---
                 controls = new THREE.OrbitControls(camera, renderer.domElement);
                 controls.enableDamping = true; controls.dampingFactor = 0.05; controls.screenSpacePanning = false;
-                controls.minDistance = semiMajorAxisRelative * 0.5; controls.maxDistance = semiMajorAxisRelative * 15;
+                controls.minDistance = semiMajorAxisRelative * 0.5; controls.maxDistance = semiMajorAxisRelative * 10;
                 controls.target.set(0, 0, 0); controls.update();
 
                 // --- Stars ---
                 const sphereGeometry = new THREE.SphereGeometry(semiMajorAxisRelative * starScaleFactor, 32, 16);
-                const primaryMaterial = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.8, metalness: 0.1, emissive: 0x442200 });
+                const primaryMaterial = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.8, metalness: 0.1 });
                 primaryStar = new THREE.Mesh(sphereGeometry, primaryMaterial); scene.add(primaryStar);
-                const secondaryMaterial = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.8, metalness: 0.1, emissive: 0x001133 });
+                const secondaryMaterial = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.8, metalness: 0.1 });
                 secondaryStar = new THREE.Mesh(sphereGeometry, secondaryMaterial); scene.add(secondaryStar);
-
-                // --- Starfield ---
-                createStarfield();
 
                 // --- Axes Helper ---
                 axesHelper = new THREE.AxesHelper(semiMajorAxisRelative * 0.5);
                 scene.add(axesHelper);
-
-                // --- Post-processing (Bloom) ---
-                const renderScene = new THREE.RenderPass(scene, camera);
-                bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-                bloomPass.threshold = 0.2;
-                bloomPass.strength = 0.4;
-                bloomPass.radius = 0.1;
-
-                composer = new THREE.EffectComposer(renderer);
-                composer.addPass(renderScene);
-                composer.addPass(bloomPass);
 
                 // --- Initial Setup ---
                 handleResize();
@@ -781,12 +629,8 @@
                 massRatioSlider.addEventListener('input', updateParameters);
                 radiusRatioSlider.addEventListener('input', updateParameters);
                 periodSlider.addEventListener('input', updateParameters);
-                lcPointsSlider.addEventListener('input', updateParameters);
+                lcPointsSlider.addEventListener('input', updateParameters); // Listener for LC points
                 pauseResumeButton.addEventListener('click', togglePause);
-                collapseButton.addEventListener('click', () => {
-                    controlsContainer.classList.toggle('collapsed');
-                    collapseButton.textContent = controlsContainer.classList.contains('collapsed') ? '☰' : '✕';
-                });
 
                 // --- Start Animation ---
                 lastTimestamp = performance.now();
@@ -802,18 +646,18 @@
         }
 
         /**
-         * Handles window resize events for both canvases and composer.
+         * Handles window resize events for both canvases.
          */
         function handleResize() {
-            // Resize 3D Canvas & Composer
+            // Resize 3D Canvas
             const container3D = document.getElementById('canvasContainer');
             const width3D = container3D.clientWidth;
             const height3D = container3D.clientHeight;
             renderer.setSize(width3D, height3D);
-            composer.setSize(width3D, height3D);
             camera.aspect = width3D / height3D;
             camera.updateProjectionMatrix();
 
+            // Trigger light curve redraw on next animation frame implicitly
             drawLightCurve(); // Force redraw immediately on resize
         }
 
@@ -829,7 +673,7 @@
             massRatio = parseFloat(massRatioSlider.value);
             radiusRatio = parseFloat(radiusRatioSlider.value);
             periodFactor = parseFloat(periodSlider.value);
-            lcPoints = parseInt(lcPointsSlider.value);
+            lcPoints = parseInt(lcPointsSlider.value); // Read LC sampling points
 
             // Update text displays
             eccentricityValue.textContent = eccentricity.toFixed(2);
@@ -839,19 +683,19 @@
             massRatioValue.textContent = massRatio.toFixed(1);
             radiusRatioValue.textContent = radiusRatio.toFixed(1);
             periodValue.textContent = periodFactor.toFixed(1);
-            lcPointsValue.textContent = lcPoints;
+            lcPointsValue.textContent = lcPoints; // Update LC points display
 
             // Update 3D visuals
-            updateOrbitLines();
+            updateOrbitLines(); // Uses TubeGeometry now
             updateStarSizes();
-            updateGeometricElements();
+            updateGeometricElements(); // Only updates lines
 
             // Update Light Curve Data
-            updateFullLightCurve();
+            updateFullLightCurve(); // Recalculate the full curve
 
             // Update star positions & current flux if paused
             if (isPaused) {
-                updateStarPositions();
+                updateStarPositions(); // Also calculates currentFlux
             }
             // Ensure light curve is drawn with new data/marker position
             drawLightCurve();
@@ -863,10 +707,10 @@
         function togglePause() {
             isPaused = !isPaused;
             pauseResumeButton.textContent = isPaused ? 'Resume Animation' : 'Pause Animation';
-            pauseResumeButton.classList.toggle('bg-blue-600', !isPaused);
-            pauseResumeButton.classList.toggle('hover:bg-blue-700', !isPaused);
-            pauseResumeButton.classList.toggle('bg-green-600', isPaused);
-            pauseResumeButton.classList.toggle('hover:bg-green-700', isPaused);
+            pauseResumeButton.classList.toggle('bg-blue-500', !isPaused);
+            pauseResumeButton.classList.toggle('hover:bg-blue-600', !isPaused);
+            pauseResumeButton.classList.toggle('bg-green-500', isPaused);
+            pauseResumeButton.classList.toggle('hover:bg-green-600', isPaused);
             if (!isPaused) {
                 lastTimestamp = performance.now();
             }
@@ -900,12 +744,12 @@
 
             if (!isPaused) {
                 currentTime += deltaTime;
-                updateStarPositions();
-                drawLightCurve();
+                updateStarPositions(); // Updates 3D positions and current flux/phase
+                drawLightCurve(); // Redraw light curve with updated marker
             }
 
             controls.update();
-            composer.render(); // Render scene with post-processing
+            renderer.render(scene, camera);
         }
 
         // --- Initialization ---
@@ -921,6 +765,7 @@
             if (renderer) renderer.dispose();
             if (scene) {
                 scene.traverse(object => {
+                    // Dispose geometries and materials
                     if (object.geometry) object.geometry.dispose();
                     if (object.material) {
                         if (Array.isArray(object.material)) {
@@ -929,7 +774,8 @@
                             object.material.dispose();
                         }
                     }
-                    if (object.isMesh || object.isLine || object.isPoints) {
+                    // Remove object from scene if it's a mesh, line, etc.
+                    if (object.isMesh || object.isLine) {
                         scene.remove(object);
                     }
                 });
