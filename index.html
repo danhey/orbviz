@@ -273,6 +273,50 @@
             background-color: #6b7280;
             /* gray-500 */
         }
+
+        /* Toggle Switch Style */
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            width: 34px;
+            height: 18px;
+            background-color: #4b5563;
+            /* gray-600 */
+            border-radius: 17px;
+            position: relative;
+            transition: background-color 0.2s;
+        }
+
+        .toggle-slider:before {
+            content: "";
+            position: absolute;
+            height: 12px;
+            width: 12px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+
+        input:checked+.toggle-slider {
+            background-color: #60a5fa;
+            /* Lighter blue */
+        }
+
+        input:checked+.toggle-slider:before {
+            transform: translateX(16px);
+        }
     </style>
 </head>
 
@@ -338,6 +382,25 @@
                 <span class="control-label">Semi-major Axis (a):</span>
                 <span class="value-display">Fixed Scale</span>
             </div>
+            <div class="control-row mt-2">
+                <label for="showElementsToggle" class="control-label">Show Geom. Elements:</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="showElementsToggle" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="control-row">
+                <label for="showXYPlaneToggle" class="control-label">Show XY Plane:</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="showXYPlaneToggle"> <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="control-row">
+                <label for="showOrbitalPlaneToggle" class="control-label">Show Orbital Plane:</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="showOrbitalPlaneToggle"> <span class="toggle-slider"></span>
+                </label>
+            </div>
             <div class="mt-2 flex flex-col gap-2"> <button id="resetViewButton" class="action-button">
                     Reset View
                 </button>
@@ -362,6 +425,9 @@
         const radiusRatioSlider = document.getElementById('radiusRatio');
         const periodSlider = document.getElementById('period');
         const lcPointsSlider = document.getElementById('lcPointsSlider');
+        const showElementsToggle = document.getElementById('showElementsToggle');
+        const showXYPlaneToggle = document.getElementById('showXYPlaneToggle'); // XY Plane Toggle
+        const showOrbitalPlaneToggle = document.getElementById('showOrbitalPlaneToggle'); // Orbital Plane Toggle
         const eccentricityValue = document.getElementById('eccentricityValue');
         const omegaValue = document.getElementById('omegaValue');
         const inclinationValue = document.getElementById('inclinationValue');
@@ -385,18 +451,27 @@
         const STARFIELD_STARS = 5000;
         const semiMajorAxisRelative = 5; // Define before use
         const totalRadiusScale = 0.15; // Define before use
+        const lineLength = 7; // Define before use
         const defaultCameraPosition = new THREE.Vector3(0, semiMajorAxisRelative * 1.5, semiMajorAxisRelative * 3); // Now defined after semiMajorAxisRelative
         const ARC_RADIUS = 1.5; // Radius for the angle arcs
         const ARC_SEGMENTS = 32; // Segments for the angle arcs
+        const AXIS_ARROW_LENGTH = 2.0; // Length of XYZ arrows
+        const AXIS_ARROW_COLOR = 0xaaaaaa; // Gray color for axes
+        const AXIS_ARROW_OPACITY = 0.5; // Opacity for axes
+        const PLANE_SIZE = lineLength * 2.5; // Size of the visualization planes
 
         // --- Scene Setup ---
         let scene, camera, renderer, controls, composer, bloomPass;
         let primaryStar, secondaryStar, starField;
         let primaryOrbitTube, secondaryOrbitTube;
-        let axesHelper, barycenterMarker;
+        let barycenterMarker;
+        let geometricElementsGroup; // Group for toggling visibility
         let referenceDirectionLine, lineOfNodesLine, periastronDirectionLine;
+        let a1Line, a2Line; // Lines for semi-major axes
         let omegaArcLine, OmegaArcLine; // Lines for angle arcs
-        const lineLength = 7;
+        let xAxisArrow, yAxisArrow, zAxisArrow; // Arrow helpers for axes
+        let xyPlaneMesh, orbitalPlaneMesh; // Meshes for visualization planes
+
 
         // --- Light Curve Setup ---
         let lcCtx;
@@ -422,6 +497,7 @@
         // semiMajorAxisRelative defined earlier
         let radius1 = 0, radius2 = 0;
         // totalRadiusScale defined earlier
+        let a1 = 0, a2 = 0; // Individual semi-major axes
 
         // --- Animation State ---
         let animationFrameId = null;
@@ -477,12 +553,17 @@
         }
 
         /**
-         * Calculates star radii based on ratio and scale.
+         * Calculates star radii and individual semi-major axes.
          */
-        function calculateStarRadii() {
+        function calculateStarRadiiAndAxes() {
             const totalRadius = totalRadiusScale * semiMajorAxisRelative;
             radius1 = totalRadius / (1 + radiusRatio);
             radius2 = radiusRatio * radius1;
+
+            // Calculate individual semi-major axes
+            const q = massRatio; // m2/m1
+            a1 = semiMajorAxisRelative * (q / (1 + q));
+            a2 = semiMajorAxisRelative * (1 / (1 + q));
         }
 
         /**
@@ -523,7 +604,7 @@
          */
         function updateFullLightCurve() {
             lightCurveData = [];
-            calculateStarRadii();
+            calculateStarRadiiAndAxes(); // Calculate radii and a1/a2
             const effectivePeriod = basePeriod / Math.max(periodFactor, 0.01);
             const numPoints = lcPoints; // Use current value
 
@@ -691,74 +772,87 @@
          * Creates or updates the geometric visualization elements (lines and angle arcs).
          */
         function updateGeometricElements() {
+            if (!geometricElementsGroup) return; // Don't update if group doesn't exist
+
             const ascNodeDir = new THREE.Vector3(Math.cos(OmegaRad), Math.sin(OmegaRad), 0).normalize();
             const periastronRelativePos = calculateRelativePosition3D(semiMajorAxisRelative, eccentricity, inclinationRad, omegaRad, OmegaRad, 0);
-            const { pos2: periPos2 } = calculateBarycentricPositions(periastronRelativePos, massRatio);
-            const periastronDir = (periPos2 && periPos2.lengthSq() > 1e-9) ? periPos2.clone().normalize() : new THREE.Vector3(1, 0, 0);
+            const { pos1: periPos1, pos2: periPos2 } = calculateBarycentricPositions(periastronRelativePos, massRatio);
+            const periastronDir1 = (periPos1 && periPos1.lengthSq() > 1e-9) ? periPos1.clone().normalize() : X_AXIS.clone().multiplyScalar(-1); // Opposite direction for star 1
+            const periastronDir2 = (periPos2 && periPos2.lengthSq() > 1e-9) ? periPos2.clone().normalize() : X_AXIS.clone();
 
             // --- Update Lines ---
             // Reference Direction Line
             const refEndPoint = X_AXIS.clone().multiplyScalar(lineLength);
-            if (!referenceDirectionLine) { const g = new THREE.BufferGeometry().setFromPoints([ORIGIN, refEndPoint]); const m = new THREE.LineBasicMaterial({ color: 0xaaaaaa }); referenceDirectionLine = new THREE.Line(g, m); scene.add(referenceDirectionLine); }
+            if (!referenceDirectionLine) { const g = new THREE.BufferGeometry().setFromPoints([ORIGIN, refEndPoint]); const m = new THREE.LineBasicMaterial({ color: 0xaaaaaa }); referenceDirectionLine = new THREE.Line(g, m); geometricElementsGroup.add(referenceDirectionLine); }
             else { referenceDirectionLine.geometry.setFromPoints([ORIGIN, refEndPoint]); referenceDirectionLine.geometry.attributes.position.needsUpdate = true; }
             // Line of Nodes
             const nodeEndPoint1 = ascNodeDir.clone().multiplyScalar(lineLength); const nodeEndPoint2 = ascNodeDir.clone().multiplyScalar(-lineLength);
-            if (!lineOfNodesLine) { const g = new THREE.BufferGeometry().setFromPoints([nodeEndPoint2, nodeEndPoint1]); const m = new THREE.LineBasicMaterial({ color: 0x34d399, linewidth: 2 }); lineOfNodesLine = new THREE.Line(g, m); scene.add(lineOfNodesLine); }
+            if (!lineOfNodesLine) { const g = new THREE.BufferGeometry().setFromPoints([nodeEndPoint2, nodeEndPoint1]); const m = new THREE.LineBasicMaterial({ color: 0x34d399, linewidth: 2 }); lineOfNodesLine = new THREE.Line(g, m); geometricElementsGroup.add(lineOfNodesLine); }
             else { lineOfNodesLine.geometry.setFromPoints([nodeEndPoint2, nodeEndPoint1]); lineOfNodesLine.geometry.attributes.position.needsUpdate = true; }
-            // Periastron Direction Line
-            const periLineEndPoint = periastronDir.clone().multiplyScalar(lineLength * 0.9);
-            if (!periastronDirectionLine) { const g = new THREE.BufferGeometry().setFromPoints([ORIGIN, periLineEndPoint]); const m = new THREE.LineBasicMaterial({ color: 0xf87171 }); periastronDirectionLine = new THREE.Line(g, m); scene.add(periastronDirectionLine); }
-            else { periastronDirectionLine.geometry.setFromPoints([ORIGIN, periLineEndPoint]); periastronDirectionLine.geometry.attributes.position.needsUpdate = true; }
+            // Periastron Direction Line (Star 2)
+            const periLineEndPoint2 = periastronDir2.clone().multiplyScalar(lineLength * 0.9);
+            if (!periastronDirectionLine) { const g = new THREE.BufferGeometry().setFromPoints([ORIGIN, periLineEndPoint2]); const m = new THREE.LineBasicMaterial({ color: 0xf87171 }); periastronDirectionLine = new THREE.Line(g, m); geometricElementsGroup.add(periastronDirectionLine); }
+            else { periastronDirectionLine.geometry.setFromPoints([ORIGIN, periLineEndPoint2]); periastronDirectionLine.geometry.attributes.position.needsUpdate = true; }
+
+            // --- Update Semi-Major Axis Lines ---
+            // a1 line (primary star)
+            const a1EndPoint = periastronDir1.clone().multiplyScalar(a1); // Use calculated a1
+            if (!a1Line) { const g = new THREE.BufferGeometry().setFromPoints([ORIGIN, a1EndPoint]); const m = new THREE.LineBasicMaterial({ color: 0xffcc88, transparent: true, opacity: 0.8 }); a1Line = new THREE.Line(g, m); geometricElementsGroup.add(a1Line); } // Lighter orange
+            else { a1Line.geometry.setFromPoints([ORIGIN, a1EndPoint]); a1Line.geometry.attributes.position.needsUpdate = true; }
+            // a2 line (secondary star)
+            const a2EndPoint = periastronDir2.clone().multiplyScalar(a2); // Use calculated a2
+            if (!a2Line) { const g = new THREE.BufferGeometry().setFromPoints([ORIGIN, a2EndPoint]); const m = new THREE.LineBasicMaterial({ color: 0xaaaaff, transparent: true, opacity: 0.8 }); a2Line = new THREE.Line(g, m); geometricElementsGroup.add(a2Line); } // Lighter blue
+            else { a2Line.geometry.setFromPoints([ORIGIN, a2EndPoint]); a2Line.geometry.attributes.position.needsUpdate = true; }
+
 
             // --- Update Angle Arcs ---
             // Omega Arc (Longitude of Ascending Node) - in XY plane
-            const OmegaArcCurve = new THREE.EllipseCurve(
-                0, 0,             // ax, aY
-                ARC_RADIUS, ARC_RADIUS, // xRadius, yRadius
-                0, OmegaRad,       // aStartAngle, aEndAngle
-                false,            // aClockwise
-                0                 // aRotation
-            );
+            const OmegaArcCurve = new THREE.EllipseCurve(0, 0, ARC_RADIUS, ARC_RADIUS, 0, OmegaRad, false, 0);
             const OmegaArcPoints = OmegaArcCurve.getPoints(ARC_SEGMENTS);
-            if (!OmegaArcLine) {
-                const geometry = new THREE.BufferGeometry().setFromPoints(OmegaArcPoints);
-                const material = new THREE.LineBasicMaterial({ color: 0x00ffff }); // Cyan
-                OmegaArcLine = new THREE.Line(geometry, material);
-                scene.add(OmegaArcLine);
-            } else {
-                OmegaArcLine.geometry.setFromPoints(OmegaArcPoints);
-                OmegaArcLine.geometry.attributes.position.needsUpdate = true;
-            }
+            if (!OmegaArcLine) { const g = new THREE.BufferGeometry().setFromPoints(OmegaArcPoints); const m = new THREE.LineBasicMaterial({ color: 0x00ffff }); OmegaArcLine = new THREE.Line(g, m); geometricElementsGroup.add(OmegaArcLine); }
+            else { OmegaArcLine.geometry.setFromPoints(OmegaArcPoints); OmegaArcLine.geometry.attributes.position.needsUpdate = true; }
 
             // omega Arc (Argument of Periastron) - in orbital plane
-            const omegaArcCurve = new THREE.EllipseCurve(
-                0, 0,             // Center at origin before rotation
-                ARC_RADIUS * 1.1, ARC_RADIUS * 1.1, // Slightly larger radius
-                0, omegaRad,       // Start at node (0 angle in orb plane), end at periastron angle
-                false,
-                0
-            );
+            const omegaArcCurve = new THREE.EllipseCurve(0, 0, ARC_RADIUS * 1.1, ARC_RADIUS * 1.1, 0, omegaRad, false, 0);
             const omegaArcPoints = omegaArcCurve.getPoints(ARC_SEGMENTS);
             const omegaArcGeometry = new THREE.BufferGeometry().setFromPoints(omegaArcPoints);
+            if (!omegaArcLine) { const m = new THREE.LineBasicMaterial({ color: 0xffff00 }); omegaArcLine = new THREE.Line(omegaArcGeometry, m); geometricElementsGroup.add(omegaArcLine); }
+            else { omegaArcLine.geometry.dispose(); omegaArcLine.geometry = omegaArcGeometry; }
+            // Orient the omega arc
+            omegaArcLine.rotation.set(0, 0, 0);
+            omegaArcLine.rotateOnWorldAxis(Z_AXIS, OmegaRad);
+            const nodeAxis = new THREE.Vector3(Math.cos(OmegaRad), Math.sin(OmegaRad), 0);
+            omegaArcLine.rotateOnWorldAxis(nodeAxis, inclinationRad);
 
-            // Create or update the line object
-            if (!omegaArcLine) {
-                const material = new THREE.LineBasicMaterial({ color: 0xffff00 }); // Yellow
-                omegaArcLine = new THREE.Line(omegaArcGeometry, material);
-                scene.add(omegaArcLine);
-            } else {
-                omegaArcLine.geometry.dispose(); // Dispose old geometry
-                omegaArcLine.geometry = omegaArcGeometry;
+            // --- Update Planes ---
+            // XY Plane (no rotation needed)
+            if (!xyPlaneMesh) {
+                const planeGeom = new THREE.PlaneGeometry(PLANE_SIZE, PLANE_SIZE);
+                const planeMat = new THREE.MeshBasicMaterial({ color: 0xcccccc, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+                xyPlaneMesh = new THREE.Mesh(planeGeom, planeMat);
+                xyPlaneMesh.visible = showXYPlaneToggle.checked; // Set initial visibility
+                scene.add(xyPlaneMesh); // Add directly to scene, not the toggle group
             }
+            xyPlaneMesh.visible = showXYPlaneToggle.checked; // Update visibility
 
-            // Orient the omega arc according to i and Omega
-            // 1. Rotate around Z by Omega to align the node line
-            // 2. Rotate around the (new) X-axis (which is now the node line) by i
-            omegaArcLine.rotation.set(0, 0, 0); // Reset rotation
-            omegaArcLine.rotateOnWorldAxis(Z_AXIS, OmegaRad); // Rotate around Z by Omega
-            const nodeAxis = new THREE.Vector3(Math.cos(OmegaRad), Math.sin(OmegaRad), 0); // Axis along the node line
-            omegaArcLine.rotateOnWorldAxis(nodeAxis, inclinationRad); // Rotate around node line by i
+            // Orbital Plane
+            if (!orbitalPlaneMesh) {
+                const planeGeom = new THREE.PlaneGeometry(PLANE_SIZE, PLANE_SIZE);
+                const planeMat = new THREE.MeshBasicMaterial({ color: 0xcc99ff, transparent: true, opacity: 0.3, side: THREE.DoubleSide }); // Pale purple
+                orbitalPlaneMesh = new THREE.Mesh(planeGeom, planeMat);
+                orbitalPlaneMesh.visible = showOrbitalPlaneToggle.checked; // Set initial visibility
+                scene.add(orbitalPlaneMesh); // Add directly to scene
+            }
+            // Orient the orbital plane
+            orbitalPlaneMesh.rotation.set(0, 0, 0); // Reset rotation
+            orbitalPlaneMesh.rotateOnWorldAxis(Z_AXIS, OmegaRad); // Rotate around Z by Omega
+            // const nodeAxis defined above
+            orbitalPlaneMesh.rotateOnWorldAxis(nodeAxis, inclinationRad); // Rotate around node line by i
+            orbitalPlaneMesh.visible = showOrbitalPlaneToggle.checked; // Update visibility
 
+
+            // Set overall group visibility based on its toggle
+            geometricElementsGroup.visible = showElementsToggle.checked;
         }
 
         /**
@@ -767,14 +861,10 @@
         function createStarfield() {
             const starVertices = [];
             for (let i = 0; i < STARFIELD_STARS; i++) {
-                const u = Math.random();
-                const v = Math.random();
-                const theta = 2 * Math.PI * u;
-                const phi = Math.acos(2 * v - 1);
+                const u = Math.random(); const v = Math.random();
+                const theta = 2 * Math.PI * u; const phi = Math.acos(2 * v - 1);
                 const r = STARFIELD_RADIUS * (0.8 + Math.random() * 0.2);
-                const x = r * Math.sin(phi) * Math.cos(theta);
-                const y = r * Math.sin(phi) * Math.sin(theta);
-                const z = r * Math.cos(phi);
+                const x = r * Math.sin(phi) * Math.cos(theta); const y = r * Math.sin(phi) * Math.sin(theta); const z = r * Math.cos(phi);
                 starVertices.push(x, y, z);
             }
             const starGeometry = new THREE.BufferGeometry();
@@ -782,6 +872,33 @@
             const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.15, sizeAttenuation: true });
             starField = new THREE.Points(starGeometry, starMaterial);
             scene.add(starField);
+        }
+
+        /**
+         * Creates the XYZ axis arrows.
+         */
+        function createAxisArrows() {
+            const headLength = AXIS_ARROW_LENGTH * 0.15;
+            const headWidth = headLength * 0.6;
+
+            // Function to create one arrow
+            const createArrow = (dir, color) => {
+                const arrow = new THREE.ArrowHelper(dir, ORIGIN, AXIS_ARROW_LENGTH, color, headLength, headWidth);
+                // Make transparent
+                arrow.line.material.transparent = true;
+                arrow.line.material.opacity = AXIS_ARROW_OPACITY;
+                arrow.cone.material.transparent = true;
+                arrow.cone.material.opacity = AXIS_ARROW_OPACITY;
+                return arrow;
+            };
+
+            xAxisArrow = createArrow(X_AXIS, AXIS_ARROW_COLOR);
+            yAxisArrow = createArrow(Y_AXIS, AXIS_ARROW_COLOR);
+            zAxisArrow = createArrow(Z_AXIS, AXIS_ARROW_COLOR);
+
+            scene.add(xAxisArrow);
+            scene.add(yAxisArrow);
+            scene.add(zAxisArrow);
         }
 
 
@@ -826,9 +943,8 @@
                 // --- Starfield ---
                 createStarfield();
 
-                // --- Axes Helper ---
-                axesHelper = new THREE.AxesHelper(semiMajorAxisRelative * 0.5);
-                scene.add(axesHelper);
+                // --- Axes Arrows ---
+                createAxisArrows(); // Create custom arrows
 
                 // --- Barycenter Marker ---
                 const barycenterGeom = new THREE.SphereGeometry(0.05, 16, 8); // Small sphere
@@ -836,6 +952,17 @@
                 barycenterMarker = new THREE.Mesh(barycenterGeom, barycenterMat);
                 barycenterMarker.position.set(0, 0, 0); // Position at the origin
                 scene.add(barycenterMarker); // Add to the scene
+
+                // --- Geometric Elements Group ---
+                geometricElementsGroup = new THREE.Group();
+                scene.add(geometricElementsGroup);
+                // Note: Lines and arcs are added to this group in updateGeometricElements
+
+                // --- Visualization Planes (Created in updateGeometricElements) ---
+                // Initialize variables so updateGeometricElements can create them
+                xyPlaneMesh = null;
+                orbitalPlaneMesh = null;
+
 
                 // --- Post-processing (Bloom) ---
                 const renderScene = new THREE.RenderPass(scene, camera);
@@ -850,7 +977,7 @@
 
                 // --- Initial Setup ---
                 handleResize();
-                updateParameters();
+                updateParameters(); // Calls updateGeometricElements which adds items to group and creates planes
 
                 // --- Event Listeners ---
                 window.addEventListener('resize', handleResize);
@@ -862,6 +989,21 @@
                 radiusRatioSlider.addEventListener('input', updateParameters);
                 periodSlider.addEventListener('input', updateParameters);
                 lcPointsSlider.addEventListener('input', updateParameters);
+                showElementsToggle.addEventListener('change', () => { // Listener for geometry toggle
+                    if (geometricElementsGroup) {
+                        geometricElementsGroup.visible = showElementsToggle.checked;
+                    }
+                });
+                showXYPlaneToggle.addEventListener('change', () => { // Listener for XY plane toggle
+                    if (xyPlaneMesh) {
+                        xyPlaneMesh.visible = showXYPlaneToggle.checked;
+                    }
+                });
+                showOrbitalPlaneToggle.addEventListener('change', () => { // Listener for Orbital plane toggle
+                    if (orbitalPlaneMesh) {
+                        orbitalPlaneMesh.visible = showOrbitalPlaneToggle.checked;
+                    }
+                });
                 pauseResumeButton.addEventListener('click', togglePause);
                 resetViewButton.addEventListener('click', resetCameraView); // Listener for reset button
                 collapseButton.addEventListener('click', () => {
@@ -930,7 +1072,7 @@
             // Update 3D visuals
             updateOrbitLines();
             updateStarSizes();
-            updateGeometricElements(); // Updates lines and angle arcs
+            updateGeometricElements(); // Updates lines, arcs, and planes
 
             // Update Light Curve Data
             updateFullLightCurve();
@@ -987,7 +1129,7 @@
             if (primaryStar) primaryStar.position.copy(pos1);
             if (secondaryStar) secondaryStar.position.copy(pos2);
 
-            calculateStarRadii();
+            calculateStarRadiiAndAxes(); // Ensure radii and a1/a2 are current
             currentFlux = calculateFlux(pos1, pos2, radius1, radius2);
         }
 
@@ -1030,7 +1172,7 @@
                             object.material.dispose();
                         }
                     }
-                    if (object.isMesh || object.isLine || object.isPoints) {
+                    if (object.isMesh || object.isLine || object.isPoints || object.isGroup || object.isArrowHelper) { // Include Group and ArrowHelper
                         scene.remove(object);
                     }
                 });
