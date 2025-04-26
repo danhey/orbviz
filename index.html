@@ -63,11 +63,16 @@
         }
 
         /* Light Curve Area */
-        #lightCurveContainer {
-            height: 180px;
-            /* Slightly taller light curve */
+        #lightCurveWrapper {
+            /* New wrapper for positioning tab */
+            position: relative;
             flex-shrink: 0;
             /* Prevent shrinking */
+        }
+
+        #lightCurveContainer {
+            height: 180px;
+            /* Initial height */
             background-color: #1f2937;
             /* Dark gray background */
             border-top: 1px solid #4b5563;
@@ -75,7 +80,17 @@
             padding: 0.75rem;
             /* p-3 */
             box-sizing: border-box;
-            position: relative;
+            overflow: hidden;
+            /* Hide canvas when height is 0 */
+            transition: height 0.3s ease-in-out, padding 0.3s ease-in-out;
+        }
+
+        #lightCurveContainer.collapsed {
+            height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            border-top: none;
+            /* Hide border when collapsed */
         }
 
         #lightCurveCanvas {
@@ -88,6 +103,45 @@
             border-radius: 0.25rem;
             /* rounded-sm */
         }
+
+        #lcToggleButton {
+            /* Style for the toggle tab */
+            position: absolute;
+            top: -24px;
+            /* Position above the container */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #1f2937;
+            /* Match container background */
+            color: #9ca3af;
+            border: 1px solid #4b5563;
+            border-bottom: none;
+            /* Remove bottom border */
+            padding: 2px 10px;
+            font-size: 0.75rem;
+            border-radius: 6px 6px 0 0;
+            /* Rounded top corners */
+            cursor: pointer;
+            z-index: 5;
+            /* Below controls but above canvas */
+            transition: color 0.2s;
+        }
+
+        #lcToggleButton:hover {
+            color: #e5e7eb;
+        }
+
+        #lcToggleButton .arrow {
+            /* Simple arrow indicator */
+            display: inline-block;
+            margin-left: 4px;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        #lightCurveContainer.collapsed+#lcToggleButton .arrow {
+            transform: rotate(180deg);
+        }
+
 
         /* Floating Controls Container */
         #controlsContainer {
@@ -325,8 +379,11 @@
         <div id="canvasContainer">
             <canvas id="orbitCanvas"></canvas>
         </div>
-        <div id="lightCurveContainer">
-            <canvas id="lightCurveCanvas"></canvas>
+        <div id="lightCurveWrapper">
+            <div id="lightCurveContainer">
+                <canvas id="lightCurveCanvas"></canvas>
+            </div>
+            <button id="lcToggleButton">Light Curve <span class="arrow">▲</span></button>
         </div>
     </div>
 
@@ -415,6 +472,8 @@
         // --- DOM Elements ---
         const orbitCanvas = document.getElementById('orbitCanvas');
         const lightCurveCanvas = document.getElementById('lightCurveCanvas');
+        const lightCurveContainer = document.getElementById('lightCurveContainer'); // Get container
+        const lcToggleButton = document.getElementById('lcToggleButton'); // Get toggle button
         const controlsContainer = document.getElementById('controlsContainer');
         const collapseButton = document.getElementById('collapseButton');
         const eccentricitySlider = document.getElementById('eccentricity');
@@ -468,7 +527,7 @@
         let geometricElementsGroup; // Group for toggling visibility
         let referenceDirectionLine, lineOfNodesLine, periastronDirectionLine;
         let a1Line, a2Line; // Lines for semi-major axes
-        let omegaArcLine, OmegaArcLine; // Lines for angle arcs
+        let omegaArcMesh, OmegaArcMesh; // Meshes for angle arcs
         let xAxisArrow, yAxisArrow, zAxisArrow; // Arrow helpers for axes
         let xyPlaneMesh, orbitalPlaneMesh; // Meshes for visualization planes
 
@@ -805,24 +864,37 @@
             else { a2Line.geometry.setFromPoints([ORIGIN, a2EndPoint]); a2Line.geometry.attributes.position.needsUpdate = true; }
 
 
-            // --- Update Angle Arcs ---
+            // --- Update Angle Arcs (as Meshes) ---
+            const arcMaterialOmega = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.4, side: THREE.DoubleSide }); // Cyan, slightly more transparent
+            const arcMaterialomega = new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.4, side: THREE.DoubleSide }); // Yellow, slightly more transparent
+
             // Omega Arc (Longitude of Ascending Node) - in XY plane
-            const OmegaArcCurve = new THREE.EllipseCurve(0, 0, ARC_RADIUS, ARC_RADIUS, 0, OmegaRad, false, 0);
-            const OmegaArcPoints = OmegaArcCurve.getPoints(ARC_SEGMENTS);
-            if (!OmegaArcLine) { const g = new THREE.BufferGeometry().setFromPoints(OmegaArcPoints); const m = new THREE.LineBasicMaterial({ color: 0x00ffff }); OmegaArcLine = new THREE.Line(g, m); geometricElementsGroup.add(OmegaArcLine); }
-            else { OmegaArcLine.geometry.setFromPoints(OmegaArcPoints); OmegaArcLine.geometry.attributes.position.needsUpdate = true; }
+            const OmegaArcGeometry = new THREE.CircleGeometry(ARC_RADIUS, ARC_SEGMENTS, 0, OmegaRad);
+            if (!OmegaArcMesh) {
+                OmegaArcMesh = new THREE.Mesh(OmegaArcGeometry, arcMaterialOmega);
+                // No rotation needed, CircleGeometry is in XY plane by default
+                geometricElementsGroup.add(OmegaArcMesh);
+            } else {
+                OmegaArcMesh.geometry.dispose();
+                OmegaArcMesh.geometry = new THREE.CircleGeometry(ARC_RADIUS, ARC_SEGMENTS, 0, OmegaRad);
+            }
 
             // omega Arc (Argument of Periastron) - in orbital plane
-            const omegaArcCurve = new THREE.EllipseCurve(0, 0, ARC_RADIUS * 1.1, ARC_RADIUS * 1.1, 0, omegaRad, false, 0);
-            const omegaArcPoints = omegaArcCurve.getPoints(ARC_SEGMENTS);
-            const omegaArcGeometry = new THREE.BufferGeometry().setFromPoints(omegaArcPoints);
-            if (!omegaArcLine) { const m = new THREE.LineBasicMaterial({ color: 0xffff00 }); omegaArcLine = new THREE.Line(omegaArcGeometry, m); geometricElementsGroup.add(omegaArcLine); }
-            else { omegaArcLine.geometry.dispose(); omegaArcLine.geometry = omegaArcGeometry; }
+            const omegaArcGeometry = new THREE.CircleGeometry(ARC_RADIUS * 1.1, ARC_SEGMENTS, 0, omegaRad);
+            if (!omegaArcMesh) {
+                omegaArcMesh = new THREE.Mesh(omegaArcGeometry, arcMaterialomega);
+                geometricElementsGroup.add(omegaArcMesh);
+            } else {
+                omegaArcMesh.geometry.dispose();
+                omegaArcMesh.geometry = new THREE.CircleGeometry(ARC_RADIUS * 1.1, ARC_SEGMENTS, 0, omegaRad);
+            }
             // Orient the omega arc
-            omegaArcLine.rotation.set(0, 0, 0);
-            omegaArcLine.rotateOnWorldAxis(Z_AXIS, OmegaRad);
+            omegaArcMesh.rotation.set(0, 0, 0); // Reset rotation
+            omegaArcMesh.quaternion.setFromUnitVectors(Z_AXIS, new THREE.Vector3(0, 0, 1)); // Align normal with Z initially
+            omegaArcMesh.rotateOnWorldAxis(Z_AXIS, OmegaRad);
             const nodeAxis = new THREE.Vector3(Math.cos(OmegaRad), Math.sin(OmegaRad), 0);
-            omegaArcLine.rotateOnWorldAxis(nodeAxis, inclinationRad);
+            omegaArcMesh.rotateOnWorldAxis(nodeAxis, inclinationRad);
+
 
             // --- Update Planes ---
             // XY Plane (no rotation needed)
@@ -1010,6 +1082,18 @@
                     controlsContainer.classList.toggle('collapsed');
                     collapseButton.textContent = controlsContainer.classList.contains('collapsed') ? '☰' : '✕';
                 });
+                lcToggleButton.addEventListener('click', () => { // Listener for LC toggle
+                    lightCurveContainer.classList.toggle('collapsed');
+                    // Optionally update arrow indicator in button
+                    const arrow = lcToggleButton.querySelector('.arrow');
+                    if (arrow) {
+                        arrow.textContent = lightCurveContainer.classList.contains('collapsed') ? '▼' : '▲';
+                    }
+                    // Redraw light curve after animation finishes if opening
+                    if (!lightCurveContainer.classList.contains('collapsed')) {
+                        setTimeout(drawLightCurve, 300); // Delay to match transition
+                    }
+                });
 
                 // --- Start Animation ---
                 lastTimestamp = performance.now();
@@ -1144,7 +1228,10 @@
             if (!isPaused) {
                 currentTime += deltaTime;
                 updateStarPositions();
-                drawLightCurve();
+                // Only draw light curve if container is not collapsed
+                if (!lightCurveContainer.classList.contains('collapsed')) {
+                    drawLightCurve();
+                }
             }
 
             controls.update();
