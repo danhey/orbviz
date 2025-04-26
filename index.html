@@ -431,9 +431,9 @@
             </div>
             <div class="control-row">
                 <label for="lcPointsSlider" class="control-label">LC Sampling:</label>
-                <input type="range" id="lcPointsSlider" name="lcPointsSlider" min="50" max="1000" step="10" value="500"
+                <input type="range" id="lcPointsSlider" name="lcPointsSlider" min="50" max="2000" step="10" value="1000"
                     class="flex-grow">
-                <span id="lcPointsValue" class="value-display">500</span>
+                <span id="lcPointsValue" class="value-display">1000</span>
             </div>
             <div class="control-row mt-2">
                 <span class="control-label">Semi-major Axis (a):</span>
@@ -702,10 +702,15 @@
             lcCtx.clearRect(0, 0, canvasWidth, canvasHeight);
             // Background is set by CSS now
 
-            // --- Calculate Y-axis scale ---
-            let minFlux = 1.0; lightCurveData.forEach(p => { minFlux = Math.min(minFlux, p.flux); });
-            const fluxRange = 1.0 - minFlux; const yMin = Math.max(0, minFlux - fluxRange * 0.1); const yMax = 1.0 + fluxRange * 0.05; const yRange = Math.max(yMax - yMin, 1e-6);
+            // --- Calculate Y-axis scale (Revised) ---
+            let actualMinFlux = 1.0;
+            lightCurveData.forEach(p => { actualMinFlux = Math.min(actualMinFlux, p.flux); });
+            // Ensure a minimum visible range, e.g., at least 0.1 flux units, or down to 0.9 if dips are shallower
+            const yMin = Math.min(0.95, actualMinFlux - 0.02); // Go slightly below min flux, but not above 0.95
+            const yMax = 1.02; // Go slightly above 1.0
+            const yRange = Math.max(yMax - yMin, 0.05); // Ensure a minimum range to prevent extreme zoom
             const getYPos = (fluxValue) => padding + plotHeight * (1.0 - (fluxValue - yMin) / yRange);
+
 
             // --- Draw Grid Lines ---
             lcCtx.strokeStyle = "#4b5563"; // Medium-dark gray grid
@@ -722,7 +727,7 @@
             const numFluxLines = 5;
             for (let i = 0; i <= numFluxLines; i++) {
                 const fluxVal = yMin + (yRange * i / numFluxLines);
-                if (Math.abs(fluxVal - 1.0) > 0.01 && Math.abs(fluxVal - minFlux) > 0.01) {
+                if (Math.abs(fluxVal - 1.0) > 0.01 && Math.abs(fluxVal - actualMinFlux) > 0.01) { // Use actualMinFlux here
                     const y = getYPos(fluxVal);
                     lcCtx.beginPath();
                     lcCtx.moveTo(padding, y);
@@ -743,7 +748,9 @@
             lcCtx.textAlign = "center"; lcCtx.textBaseline = "top";
             lcCtx.fillText("0.0", padding, canvasHeight - padding + 4 * dpr); lcCtx.fillText("0.5", padding + plotWidth / 2, canvasHeight - padding + 4 * dpr); lcCtx.fillText("1.0", padding + plotWidth, canvasHeight - padding + 4 * dpr); lcCtx.fillText("Phase", padding + plotWidth / 2, canvasHeight - padding + 12 * dpr);
             lcCtx.textAlign = "right"; lcCtx.textBaseline = "middle";
-            lcCtx.fillText("1.0", padding - 4 * dpr, getYPos(1.0)); const minFluxYPos = getYPos(minFlux); lcCtx.fillText(minFlux.toFixed(2), padding - 4 * dpr, minFluxYPos);
+            lcCtx.fillText("1.0", padding - 4 * dpr, getYPos(1.0));
+            const minFluxYPos = getYPos(actualMinFlux); // Use actualMinFlux
+            lcCtx.fillText(actualMinFlux.toFixed(2), padding - 4 * dpr, minFluxYPos); // Label the actual minimum
             lcCtx.save(); lcCtx.translate(padding - 15 * dpr, canvasHeight / 2); lcCtx.rotate(-Math.PI / 2); lcCtx.textAlign = "center"; lcCtx.fillText("Norm. Flux", 0, 0); lcCtx.restore();
 
             // --- Draw Full Light Curve ---
@@ -872,7 +879,7 @@
             const OmegaArcGeometry = new THREE.CircleGeometry(ARC_RADIUS, ARC_SEGMENTS, 0, OmegaRad);
             if (!OmegaArcMesh) {
                 OmegaArcMesh = new THREE.Mesh(OmegaArcGeometry, arcMaterialOmega);
-                // No rotation needed, CircleGeometry is in XY plane by default
+                // OmegaArcMesh.rotation.x = -Math.PI / 2; // This was incorrect
                 geometricElementsGroup.add(OmegaArcMesh);
             } else {
                 OmegaArcMesh.geometry.dispose();
